@@ -1,0 +1,5 @@
+networkx
+netrd
+numpy 
+scipy
+infomap
