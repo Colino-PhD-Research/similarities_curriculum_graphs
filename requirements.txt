@@ -3,3 +3,4 @@ netrd
 numpy 
 scipy
 infomap
+
