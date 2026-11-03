@@ -3,3 +3,7 @@ netrd
 numpy 
 scipy
 infomap
+scikit-learn
+matplotlib
+pandas
+
