@@ -20,7 +20,9 @@ class SimilarityMeasures:
         return graph_signature(feature_extraction(G))   
 
     # claude generated, hand-verified
-    def rw_distance(self, G, ds=(10, 20, 50, 100), walks=100, rng=random.Random(0)):
+    def rw_distance(self, G, ds=(10, 20, 50, 100), walks=100, rng=None):
+        rng = rng or random.Random(0)
+
         nodes = [v for v in G if G.degree(v) > 0]
         feats = []
         for d in ds:
@@ -37,13 +39,13 @@ class SimilarityMeasures:
     # claude generated, hand verified
     def infomap(self, G, infomap_type, seed=42, trials=10):
         # type must be "in", "known", or "in_and_known"
-        
+
         def infomap_partition(G: nx.Graph, seed: int = 42, trials: int = 10) -> np.ndarray:
             """Run two-level, undirected Infomap. Returns module label per node index (0..n-1)."""
             im = Infomap(f"--two-level --silent --seed {seed} --num-trials {trials}")
             mapping = im.add_networkx_graph(G)          # {infomap_id: original node}
             im.run()
-            labels = np.empty(G.number_of_nodes(), dtype=np.int64)
+            labels = np.full(G.number_of_nodes(), -1, dtype=np.int64)
             for infomap_id, module_id in im.get_modules().items():
                 labels[mapping[infomap_id]] = module_id
             assert (labels >= 0).all(), "some nodes received no module from Infomap"
