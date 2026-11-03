@@ -3,3 +3,5 @@ netrd
 numpy 
 scipy
 infomap
+scikit-learn
+pytest
