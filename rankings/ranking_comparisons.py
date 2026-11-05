@@ -104,7 +104,7 @@ def pairwise_correlations(scores: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
 # --------------------------------------------------------------------------- Kemeny-Young consensus
 
-# TODO: come back to
+# hand-verified
 def kemeny_consensus(scores: pd.DataFrame) -> pd.Series:
     """Exact Kemeny-Young consensus of the methods' rankings, solved as an integer program.
 
@@ -115,12 +115,19 @@ def kemeny_consensus(scores: pd.DataFrame) -> pd.Series:
     """
     items = list(scores.columns)
     k = len(items)
-    S = scores.to_numpy(dtype=float)
-    P = (S[:, :, None] > S[:, None, :]).sum(axis=0)
 
+    # if we only have one item there's not ranking to do, that item will always be 1
     if k == 1:
-        return pd.Series([1], index=items, name="consensus_rank")
+            return pd.Series([1], index=items, name="consensus_rank")
 
+    # Otherwise let's calculate our P matrix
+    S = scores.to_numpy(dtype=float) # shape (m. k): methods x networks
+    # S[:, :, None] -> shape (m, k, 1)
+    # S[:, None, :] -> shape (m, 1, k)
+    # (S[:, :, None] > S[:, None, :]) -> shape (m, k, k)
+    P = (S[:, :, None] > S[:, None, :]).sum(axis=0) # shape (k, k): network x network
+
+    # test all possible rankings and calculate a score for each ranking (later we will compare them)
     pairs = list(combinations(range(k), 2))
     var = {pair: idx for idx, pair in enumerate(pairs)}
     # maximize sum (P_ij - P_ji) y_ij  ->  minimize the negative
@@ -128,6 +135,8 @@ def kemeny_consensus(scores: pd.DataFrame) -> pd.Series:
 
     rows, cols, vals, upper = [], [], [], []
     r = 0
+    # for each triple i < j < l, there are exactly two possible cycles, and each one gets a constraint
+    # this is needed because we want to forbid the solver from making cycles which ruin the meaning of a ranking (ex A > B, B > C, C > A)
     for i, j, l in combinations(range(k), 3):
         # no cycle i>j>l>i:  y_ij + y_jl - y_il <= 1 ; no cycle i>l>j>i:  -y_ij - y_jl + y_il <= 0
         for coeffs, ub in (((1, 1, -1), 1), ((-1, -1, 1), 0)):
@@ -137,22 +146,28 @@ def kemeny_consensus(scores: pd.DataFrame) -> pd.Series:
             r += 1
 
     constraints = []
+    # if there are constraints from the previous step (r > 0)
     if r:
+        # build sparse matrix from the triplets
         A = coo_matrix((vals, (rows, cols)), shape=(r, len(pairs)))
-        constraints.append(LinearConstraint(A, -np.inf, np.array(upper, dtype=float)))
+        constraints.append(LinearConstraint(A, -np.inf, np.array(upper, dtype=float))) # matrix, lower bound, upper bound
 
+    # integrality makes sure every variable is an integer
+    # bounds set to be between 0 and 1 to make every variable binary
+    # solve problem with our constraints
     res = milp(c, constraints=constraints, integrality=np.ones(len(pairs)), bounds=Bounds(0, 1))
     if not res.success:
         raise RuntimeError(f"Kemeny MILP failed: {res.message}")
 
+    # round because solver can return floats like 0.9999
     y = np.round(res.x).astype(int)
-    wins = np.zeros(k, dtype=int)                 # number of networks each one is placed above
+    wins = np.zeros(k, dtype=int)      # number of networks each one is placed above
     for (i, j), idx in var.items():
         if y[idx]:
             wins[i] += 1
         else:
             wins[j] += 1
-    position = k - wins                           # 1 = top of the consensus
+    position = k - wins      # 1 = top of the consensus (position 1 is index 0)
     return pd.Series(position, index=items, name="consensus_rank").sort_values()
 
 
@@ -210,6 +225,7 @@ def compare_methods(
 
 # --------------------------------------------------------------------------- experiment helpers
 
+# hand-verified
 def make_baselines(G: nx.Graph, frac: float = 0.05, seed: int = 0) -> dict[str, nx.Graph]:
     """Section 5.3 baselines: delete a random frac of edges, and rewire a random frac of edges
     with degree-preserving double edge swaps (each swap rewires two edges)."""
@@ -219,12 +235,19 @@ def make_baselines(G: nx.Graph, frac: float = 0.05, seed: int = 0) -> dict[str, 
     deleted = G.copy()
     deleted.remove_edges_from(rng.sample(list(G.edges()), int(round(frac * m))))
 
+    """
+    Note: the paper doesn't mention HOW the rewiring is done. With this in mind, we 
+    go the simpler route of swapping edges as this does count as rewiring and makes it much simpler to keep node degrees fixed
+    According to Claude, this method of double edge swap is known as the Maslov-Sneppen method and is rather standard when randomizing graphs while maintaining node degrees
+    """
     rewired = G.copy()
     nswap = max(1, math.ceil(frac * m / 2))
+    # double edge swap does "swap two edges int the graph while keeping the node degrees fixed" https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.swap.double_edge_swap.html 
     nx.double_edge_swap(rewired, nswap=nswap, max_tries=100 * nswap, seed=seed)
     return {"deleted": deleted, "rewired": rewired}
 
 
+# hand-verified
 def cross_sectional_experiment(
     networks: Mapping[str, nx.Graph],
     feature_methods: Mapping[str, FeatureFn] | None = None,
@@ -242,10 +265,13 @@ def cross_sectional_experiment(
     return results
 
 
+# hand-verified
+# returns indices of upper right triangle (excluding the diagonal)
 def _upper(df: pd.DataFrame) -> np.ndarray:
     return df.to_numpy()[np.triu_indices(len(df), k=1)]
 
 
+# hand-verfied
 def summarize(results: Mapping[str, RankingComparison], alpha: float = 0.1) -> pd.DataFrame:
     """Statistics pooled over every method pair (upper triangle) of every reference network,
     as in Section 5.3: mean/std Kendall-Tau distance, mean/std nDCG, fraction significant."""
@@ -257,18 +283,18 @@ def summarize(results: Mapping[str, RankingComparison], alpha: float = 0.1) -> p
         "std": [np.nanstd(kd), np.nanstd(nd), np.nan],
     }, index=["kendall_distance", "ndcg", f"fraction_significant_p<{alpha}"])
 
-
+# hand-verified
 def average_matrix(results: Mapping[str, RankingComparison], field: str = "kendall") -> pd.DataFrame:
     """Method x method matrix averaged over reference networks (e.g. RW vs RWR across all networks)."""
     frames = [getattr(r, field) for r in results.values()]
     return sum(frames) / len(frames)
 
-
+# hand-verified
 def consensus_table(results: Mapping[str, RankingComparison], n: int = 5) -> pd.DataFrame:
     """Table 5: the n methods closest to the consensus, one column per reference network."""
     return pd.DataFrame({ref: r.closest_to_consensus(n) for ref, r in results.items()})
 
-
+# hand-verified
 def consensus_distance_table(results: Mapping[str, RankingComparison]) -> pd.DataFrame:
     """Figure 7: methods x reference networks, Kendall-Tau distance from each consensus."""
     return pd.DataFrame({ref: r.to_consensus for ref, r in results.items()})
@@ -276,6 +302,7 @@ def consensus_distance_table(results: Mapping[str, RankingComparison]) -> pd.Dat
 
 # --------------------------------------------------------------------------- plotting
 
+# hand-verified
 def plot_heatmap(matrix: pd.DataFrame, title: str = "", order: list[str] | None = None,
                  vmin: float = 0.0, vmax: float = 1.0, cmap: str = "jet", ax=None):
     """Heatmap in the style of the paper's figures. Pass order to fix the method order."""
@@ -296,7 +323,7 @@ def plot_heatmap(matrix: pd.DataFrame, title: str = "", order: list[str] | None 
     ax.figure.tight_layout()
     return ax
 
-
+# hand-verified
 def plot_significance(result: RankingComparison, alpha: float = 0.1, title: str = "",
                       order: list[str] | None = None, ax=None):
     """Black = significant at alpha, white = not, as in the technical report's figures."""
@@ -308,7 +335,7 @@ def plot_significance(result: RankingComparison, alpha: float = 0.1, title: str 
 
 if __name__ == "__main__":
     from functools import partial
-    from similarity_measures import SimilarityMeasures
+    from similarity_measures.similarity_measures import SimilarityMeasures
 
     sm = SimilarityMeasures()
     feature_methods = {
