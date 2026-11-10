@@ -4,4 +4,6 @@ numpy
 scipy
 infomap
 scikit-learn
-pytest
+matplotlib
+pandas
+
