@@ -7,4 +7,4 @@ name = "similarities-curriculum-graphs"
 version = "0.1.0"
 
 [tool.setuptools]
-packages = ["similarity_measures"]
+packages = ["similarity_measures", "clustering"]

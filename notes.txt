@@ -1,0 +1,22 @@
+Another AB implimentation:
+
+for _ in range(max_swaps):
+            # Get the fringe nodes of the current community
+            fridge = nx.node_boundary(G, C)
+            if not fridge:
+                break
+
+            beta = {w: sum(1 for u in G.neighbors(w) if u in C) + 1 for w in C}
+            alpha = {v: sum(1 for u in G.neighbors(v) if u in C) + 1 for v in fridge}
+            beta_S, alpha_S = min(beta.values()), max(alpha.values())
+
+            if beta_S >= alpha_S:
+                break  # No more swaps possible
+
+            # ties broken randomly ([7]: "pick a vertex a ∈ A and a vertex b ∈ B")
+            b = rng.choice([w for w in C if beta[w] == beta_S])
+            a = rng.choice([v for v in fridge if alpha[v] == alpha_S])
+            C.remove(b)
+            C.add(a)
+
+        return C
