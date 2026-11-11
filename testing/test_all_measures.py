@@ -62,7 +62,7 @@ def test_netsimile_vector_length_35(sm, BA):
 def test_netsimile_vector_deterministic(sm, BA):
     assert np.array_equal(sm.netsimile(BA), sm.netsimile(BA))
 
-
+# Test that netsimile with 'svm' returns a matrix of shape (min(300, n), 7)
 def test_netsimile_svm_samples_300_rows(sm, BA):
     assert sm.netsimile(BA, "svm").shape == (300, 7)
 
@@ -202,32 +202,32 @@ def test_community_features_path_hand_check(sm):
         1, 1, 1, 1, 1,                        # 21-25: alpha, fringe nodes 4 and 8
         1, 1, 1, 1.5, 2,                      # 26-30: beta, degrees [1,2,1]
         1 / 3,                                # 31: treesum, 1 tree / 3^1
-        1 / 3, 1 / 3, 1 / 3, 5 / 12, 1 / 2,   # 32-36: information centrality [1/3, 1/2, 1/3]
+        1, 1, 1, 5 / 4, 3 / 2,                # 32-36: Stephenson-Zelen information centrality n / sum_j R_ij = [1, 3/2, 1]
     ]
-    assert np.allclose(sm.community_features(nx.path_graph(10), {5, 6, 7}), expected)
+    assert np.allclose(sm._community_features(nx.path_graph(10), {5, 6, 7}), expected)
 
 
 def test_community_features_clique(sm):
-    f = sm.community_features(nx.complete_graph(6), {0, 1, 2, 3})
+    f = sm._community_features(nx.complete_graph(6), {0, 1, 2, 3})
     assert f[5] == pytest.approx(1)    # transitivity
     assert f[6] == pytest.approx(1)    # triangle density
     assert f[30] == pytest.approx(1)   # treesum: K4 has all of K4's spanning trees
 
 
 def test_community_features_treesum_matches_exact_count(sm, BA):
-    C = sm.bfs_community(BA, 12, random.Random(0))
+    C = sm._bfs_community(BA, 12, random.Random(0))
     exact = nx.number_of_spanning_trees(BA.subgraph(C)) / 12 ** 10
-    assert sm.community_features(BA, C)[30] == pytest.approx(exact)
+    assert sm._community_features(BA, C)[30] == pytest.approx(exact)
 
 
 def test_community_features_string_labels(sm):
     G = nx.relabel_nodes(nx.path_graph(10), {i: f"n{i}" for i in range(10)})
-    assert np.allclose(sm.community_features(G, {"n5", "n6", "n7"}),
-                       sm.community_features(nx.path_graph(10), {5, 6, 7}))
+    assert np.allclose(sm._community_features(G, {"n5", "n6", "n7"}),
+                       sm._community_features(nx.path_graph(10), {5, 6, 7}))
 
 
 def test_community_features_large_community_no_overflow(sm, BA):
-    f = sm.community_features(BA, sm.bfs_community(BA, 200, random.Random(0)))
+    f = sm._community_features(BA, sm._bfs_community(BA, 200, random.Random(0)))
     assert f.shape == (36,)
     assert np.isfinite(f).all()
 
@@ -239,7 +239,7 @@ def is_consecutive(nodes):
     return nodes == list(range(nodes[0], nodes[0] + len(nodes)))
 
 
-@pytest.mark.parametrize("finder", ["bfs_community", "ab_community", "rw_community"])
+@pytest.mark.parametrize("finder", ["_bfs_community", "_ab_community", "_rw_community"])
 def test_finder_size_and_connected(sm, BA, finder):
     rng = random.Random(0)
     for _ in range(50):
@@ -248,20 +248,20 @@ def test_finder_size_and_connected(sm, BA, finder):
         assert nx.is_connected(BA.subgraph(C))
 
 
-@pytest.mark.parametrize("finder", ["bfs_community", "ab_community", "rw_community"])
+@pytest.mark.parametrize("finder", ["_bfs_community", "_ab_community", "_rw_community"])
 def test_finder_reproducible(sm, BA, finder):
     f = getattr(sm, finder)
     assert f(BA, 15, random.Random(7)) == f(BA, 15, random.Random(7))
 
 
-@pytest.mark.parametrize("finder", ["bfs_community", "rw_community"])
+@pytest.mark.parametrize("finder", ["_bfs_community", "_ab_community", "_rw_community"])
 def test_finder_on_path_is_consecutive(sm, finder):
     rng = random.Random(0)
     for _ in range(20):
         assert is_consecutive(getattr(sm, finder)(nx.path_graph(10), 4, rng))
 
 
-@pytest.mark.parametrize("finder", ["bfs_community", "ab_community", "rw_community"])
+@pytest.mark.parametrize("finder", ["_bfs_community", "_ab_community", "_rw_community"])
 def test_finder_component_too_small(sm, two_triangles, finder):
     # can't reach 5 nodes inside a triangle: returns fewer than k instead of hanging
     assert len(getattr(sm, finder)(two_triangles, 5, random.Random(0))) == 3
@@ -271,7 +271,7 @@ def test_bfs_star_from_center_takes_center_plus_leaves(sm):
     # star_graph(6): center 0, leaves 1-6; any BFS community of size 4 must include the center
     rng = random.Random(0)
     for _ in range(20):
-        assert 0 in sm.bfs_community(nx.star_graph(6), 4, rng)
+        assert 0 in sm._bfs_community(nx.star_graph(6), 4, rng)
 
 
 def test_ab_barbell_finds_a_clique(sm):
@@ -279,14 +279,14 @@ def test_ab_barbell_finds_a_clique(sm):
     left, right = set(range(10)), set(range(10, 20))
     rng = random.Random(0)
     for _ in range(20):
-        assert sm.ab_community(nx.barbell_graph(10, 0), 10, rng) in (left, right)
+        assert sm._ab_community(nx.barbell_graph(10, 0), 10, rng) in (left, right)
 
 
 def test_ab_returns_alpha_beta_communities(sm, BA):
     # [7]: beta(S) (member neighbors in C, +1 self-loop) > alpha(S) (fringe neighbors in C)
     rng = random.Random(0)
     for _ in range(50):
-        C = sm.ab_community(BA, 20, rng)
+        C = sm._ab_community(BA, 20, rng)
         beta = min(sum(u in C for u in BA.neighbors(w)) + 1 for w in C)
         alpha = max(sum(u in C for u in BA.neighbors(v)) for v in nx.node_boundary(BA, C))
         assert beta > alpha
@@ -294,12 +294,12 @@ def test_ab_returns_alpha_beta_communities(sm, BA):
 
 def test_rw_isolated_start_node(sm):
     G = nx.empty_graph(1)
-    assert sm.rw_community(G, 3, random.Random(0)) == {0}
+    assert sm._rw_community(G, 3, random.Random(0)) == {0}
 
 
 def test_rwr_restart_one_never_leaves_start(sm, BA):
     # restart=1 jumps back every step, so only the start node is ever visited
-    assert len(sm.rw_community(BA, 10, random.Random(0), restart=1.0)) == 1
+    assert len(sm._rw_community(BA, 10, random.Random(0), restart=1.0)) == 1
 
 
 def test_rwr_more_compact_than_rw(sm, BA):
@@ -377,6 +377,7 @@ def test_vector_similar_graphs_score_higher(sm, s, BA, BA2, ER):
 
 # ---------- find_similarity: svm ----------
 
+# Tests SVM netsimile similarity measure. The SVM is trained on a sample of up to 300 nodes from each graph, and the similarity score is based on how well the SVM can distinguish between the two graphs. A score of 1 indicates that the graphs are indistinguishable, while a score of -1 indicates perfect separation.
 def test_svm_perfect_separation_is_minus_1(sm, s):
     sim = s.find_similarity(nx.cycle_graph(300), nx.complete_graph(300), "svm", sm.netsimile, netsimile_type="svm")
     assert sim == pytest.approx(-1)
