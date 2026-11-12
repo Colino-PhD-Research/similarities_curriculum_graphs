@@ -7,74 +7,130 @@ distance from rankings.ranking_comparisons.pairwise_correlations(...)["kendall"]
 average_matrix(results, "kendall").
 
 Output is a linkage matrix in scipy's format, so scipy.cluster.hierarchy.dendrogram,
-fcluster, leaves_list, etc. work on it directly.
+fcluster, leaves_list, etc. work on it directly. This is run for each network.
 """
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from collections import Counter
+
+class CompleteLinkageClustering:
+    def __init__(self, D: np.ndarray):
+        """
+        Complete-linkage agglomerative clustering.
+
+        D   : (n, n) symmetric distance matrix with zero diagonal.
+        """
+        self.D = np.asarray(D, dtype=float)
+        self.labels = list(D.index) if hasattr(D, "index") else list(range(len(D)))
+        self.n = len(D)
+        if self.D.shape != (self.n, self.n) or not np.allclose(self.D, self.D.T):
+            raise ValueError("D must be a square, symmetric distance matrix")
+        if np.isnan(self.D).any():
+            raise ValueError("D contains NaN")
 
 
-def complete_linkage(D: pd.DataFrame | np.ndarray) -> np.ndarray:
-    """Agglomerative clustering where the distance between two clusters is the largest
-    distance between any member of one and any member of the other.
-
-    Returns Z, shape (n - 1, 4). Row i merges clusters Z[i, 0] and Z[i, 1] at distance Z[i, 2]
-    into a new cluster of Z[i, 3] items, which gets id n + i. Ids 0..n-1 are the original items.
-    """
-    D = np.asarray(D, dtype=float)
-    n = len(D)
-    if D.shape != (n, n) or not np.allclose(D, D.T):
-        raise ValueError("D must be a square, symmetric distance matrix")
-    if np.isnan(D).any():
-        raise ValueError("D contains NaN")
-
-    # cluster id -> (member indices); dist[a][b] = complete-linkage distance between clusters
-    members = {i: [i] for i in range(n)}
-    dist = {i: {j: D[i, j] for j in range(n) if j != i} for i in range(n)}
-    Z = np.zeros((n - 1, 4))
-
-    for step in range(n - 1):
-        # closest pair of active clusters
-        a, b = min(((a, b) for a in dist for b in dist[a] if a < b), key=lambda p: dist[p[0]][p[1]])
-        new = n + step
-        Z[step] = [a, b, dist[a][b], len(members[a]) + len(members[b])]
-
-        # Lance-Williams update for complete linkage: d(a u b, c) = max(d(a, c), d(b, c))
-        dist[new] = {}
-        for c in dist:
-            if c in (a, b, new):
-                continue
-            d = max(dist[a][c], dist[b][c])
-            dist[new][c] = dist[c][new] = d
-            del dist[c][a], dist[c][b]
-        del dist[a], dist[b]
-        members[new] = members.pop(a) + members.pop(b)
-
-    return Z
+        # cluster id -> (member indices); dist[a][b] = complete-linkage distance between clusters
+        #self.members = {i: [i] for i in range(self.n)} # Initially each cluster starts with one member (one similarity method)
+        #self.dist = {i: {j: self.D[i, j] for j in range(self.n) if j != i} for i in range(self.n)} # distances between clusters
+        #self.Z = np.zeros((self.n - 1, 4))
 
 
-def cut(Z: np.ndarray, labels: list[str], k: int) -> list[list[str]]:
-    """Cut the dendrogram into k clusters by undoing the last k - 1 merges."""
-    n = len(labels)
-    if not 1 <= k <= n:
-        raise ValueError(f"k must be between 1 and {n}")
-    members = {i: [labels[i]] for i in range(n)}
-    for step in range(n - k):
-        a, b = int(Z[step, 0]), int(Z[step, 1])
-        members[n + step] = members.pop(a) + members.pop(b)
-    return list(members.values())
+
+    # ---------------------------------------------------------------------------
+    # 1. The algorithm
+    # ---------------------------------------------------------------------------
+    def complete_linkage(self) -> np.ndarray:
+        """
+        Complete-linkage agglomerative clustering.
+    
+        D   : (n, n) symmetric distance matrix with zero diagonal.
+    
+        Returns a SciPy-style linkage matrix Z of shape (n-1, 4). Row t says that
+        at step t clusters Z[t,0] and Z[t,1] merged at distance Z[t,2], producing
+        a cluster of size Z[t,3] whose id is n + t. Leaves have ids 0..n-1.
+        Ties between equally close cluster pairs are broken at random.
+        """
+        
+        n = len(self.D)
+        
+        rng = np.random.default_rng()
+
+        # cluster id -> (member indices); dist[a][b] = complete-linkage distance between clusters
+        members = {i: [i] for i in range(n)} # Initially each cluster starts with one member (one similarity method)
+        dist = {(i, j): self.D[i, j] for i in range(n) for j in range(i + 1, n)} # distances between clusters
+        Z = np.zeros((n - 1, 4))
+
+        for step in range(n - 1):
+            # --- find the closest pair of active clusters ---
+            best = min(dist.values())
+            tol = 1e-12
+            candidates = [pair for pair, d in dist.items() if d <= best + tol]
+            a, b = rng.choice(candidates) 
+            
+            # --- merge them into a new cluster ---
+            new = n + step
+            members[new] = members.pop(a) + members.pop(b)
+            Z[step] = [a, b, best, len(members[new])]
+
+            # Lance-Williams update for complete linkage: d(a u b, c) = max(d(a, c), d(b, c))
+            # --- update distances: COMPLETE linkage = take the max ---
+            # (Lance-Williams update: d(k, a∪b) = max(d(k, a), d(k, b)).
+            #  Single linkage would use min, average linkage a size-weighted mean.)
+            for k in members:
+                if k == new:
+                    continue
+                d_ka = dist.pop((min(k, a), max(k, a)))
+                d_kb = dist.pop((min(k, b), max(k, b)))
+                dist[(k, new)] = max(d_ka, d_kb)
+            dist.pop((a, b))
+
+        return Z
 
 
-def plot_dendrogram(D: pd.DataFrame, title: str = "", ax=None):
-    """Complete-linkage dendrogram of a labeled distance matrix (labels = D.index)."""
-    import matplotlib.pyplot as plt
-    from scipy.cluster.hierarchy import dendrogram
 
-    if ax is None:
-        _, ax = plt.subplots(figsize=(8, 5))
-    dendrogram(complete_linkage(D), labels=list(D.index), ax=ax, leaf_rotation=90)
-    ax.set_ylabel("complete-linkage distance")
-    ax.set_title(title)
-    ax.figure.tight_layout()
-    return ax
+    # ---------------------------------------------------------------------------
+    # 2. Turning a tree into something you can count
+    # ---------------------------------------------------------------------------
+    # Note: The paper says "treat each dendrogram as a tree “without information about clustering order"; Claude implemented this as the set of leaf-sets of every internal node. Two dendrograms with the same nested groups get the same signature even if their merges happened in a different order or height.
+    @staticmethod
+    def _tree_signature(Z, labels):
+        """
+        The tree 'without information about clustering order': the set of leaf-sets
+        of every internal node. Two dendrograms with the same nested groups get the
+        same signature even if their merges happened in a different order or height.
+        """
+        n = len(labels)
+        leaves = {i: frozenset([labels[i]]) for i in range(n)}
+        groups = []
+        for t, (a, b, _, _) in enumerate(Z):
+            leaves[n + t] = leaves[int(a)] | leaves[int(b)]
+            groups.append(leaves[n + t])
+        return frozenset(groups)
+
+    # ---------------------------------------------------------------------------
+    # 3. The paper's procedure for one reference network
+    # ---------------------------------------------------------------------------
+    def modal_tree(self, runs=1000):
+        """
+        Cluster `runs` times with random tie-breaking; return the most common tree.
+
+        Returns (signature, fraction of runs that produced it, number of distinct
+        trees seen, Z), where Z is one linkage matrix that produced the modal tree,
+        so it can be plotted with real merge heights.
+        """
+        counts = Counter()
+        example_Z = {}  # signature -> first Z that produced it
+        for _ in range(runs):
+            Z = self.complete_linkage()
+            sig = self._tree_signature(Z, self.labels)
+            counts[sig] += 1
+            example_Z.setdefault(sig, Z)
+        signature, freq = counts.most_common(1)[0]
+        return signature, freq / runs, len(counts), example_Z[signature]
+
+
+
+
+
