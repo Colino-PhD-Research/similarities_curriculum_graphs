@@ -136,7 +136,7 @@ Each difference is the length of one row’s slice, which is that node’s numbe
     return out
 
 
-def table2_stats(edges):
+def table_stats(edges):
     """Table-2 statistics computed with scipy (fast, low memory)."""
     ids, inv = np.unique(edges, return_inverse=True)
     e = inv.reshape(-1, 2)
@@ -186,5 +186,5 @@ if __name__ == "__main__":
         f.write("# LJ2-like sample of lj2_whole (see sample_lj.py)\n")
         f.write(f"# Nodes: {len(np.unique(E))} Edges: {len(E)}\n")
         np.savetxt(f, E, fmt="%d", delimiter="\t")
-    for key, val in table2_stats(E).items():
+    for key, val in table_stats(E).items():
         print(f"{key:>13}: {val}")

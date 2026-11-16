@@ -10,9 +10,20 @@ Everything else is helper
 """
 
 
-longitudinal_networks = ["twitter replies", "twitter retweets", "yahoo"]
-
 DATASETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "datasets")
+
+# snapshots() arguments that reproduce the paper's longitudinal datasets
+# usage ex: graphs = snapshots(**longitudinal_networks["yahoo"])
+longitudinal_networks = {
+    # 30 daily graphs, June 2009; "message" = tweet starts with @user (a reply)
+    "twitter replies": dict(source=os.path.join(DATASETS_DIR, "twitter", "tweet_graph.data"),
+                            freq="D", start="2009-06-01", end="2009-06-30", types=["message"]),
+    # 5 monthly graphs, May-Sep 2009
+    "twitter retweets": dict(source=os.path.join(DATASETS_DIR, "twitter", "retweet_graph.data"),
+                             freq="M", start="2009-05-01", end="2009-09-30"),
+    # 28 daily graphs, Mar 31 - Apr 27 2008 (files d00-d27)
+    "yahoo": dict(source=os.path.join(DATASETS_DIR, "yahoo"), freq="D"),
+}
 
 # note lj1 and lj2 take a long time to load (~20 seconds)
 cross_sectional_files = {
@@ -109,25 +120,34 @@ Yahoo! Messenger (Webscope G5, one space-separated .txt file per day)
     type is always 'message'.
 
 Examples
-    from longitudinal_data import load, snapshots
+    from load_data.load_data import load, snapshots, to_graph, longitudinal_networks
+
+    # The paper's three datasets, using the settings in longitudinal_networks
+    replies  = snapshots(**longitudinal_networks["twitter replies"])
+    retweets = snapshots(**longitudinal_networks["twitter retweets"])
+    daily    = snapshots(**longitudinal_networks["yahoo"])
 
     # Twitter Retweets: 5 monthly graphs, May-Sep 2009
-    rt = load("datasets/twitter/retweet_graph.data")
-    retweets = snapshots(rt, freq="M", start="2009-05-01", end="2009-09-30")
+    retweets = snapshots("datasets/twitter/retweet_graph.data", freq="M",
+                         start="2009-05-01", end="2009-09-30")
 
-    # Twitter Replies: 30 daily graphs, June 2009
-    tw = load("datasets/twitter/tweet_graph.data")
-    replies = snapshots(tw, freq="D", start="2009-06-01", end="2009-06-30")
+    # Twitter Replies: 30 daily graphs, June 2009, replies only
+    replies = snapshots("datasets/twitter/tweet_graph.data", freq="D",
+                        start="2009-06-01", end="2009-06-30", types=["message"])
 
     # Yahoo! IM: 28 daily graphs, then 4-day and 7-day bins as in the paper
-    ym = load("datasets/yahoo")              # folder, glob, file or list
+    ym = "datasets/yahoo"                    # folder, glob, file or list
     daily   = snapshots(ym, freq="D")
     fourday = snapshots(ym, days=4)          # bins start at D00, Mar 31
     weekly  = snapshots(ym, days=7)
     cumul   = snapshots(ym, freq="D", cumulative=True)
 
-    # Filtering: use types= for the type column, or filter the frame first
-    contacts_only = snapshots(ym[ym["in_contacts"] == "y"], freq="D")
+    # Filtering: use types= for the type column. snapshots only takes a path,
+    # so to filter on another column, load the frame and build graphs yourself
+    df = load(ym)
+    contacts = df[df["in_contacts"] == "y"]
+    contacts_only = {day: to_graph(group) for day, group in
+                     contacts.groupby(contacts["time"].dt.strftime("%Y-%m-%d"))}
 """
 import glob
 import os
