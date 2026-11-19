@@ -472,6 +472,47 @@ class SimilarityMeasures:
 
     
 
+# Scoring functions for the classifier- and matching-based methods. They take the two graphs'
+# sample matrices (one row per node / community sample), so callers that already have the
+# features (e.g. a cache in run_experiments/cross_sectional_experiments.py) can score a pair
+# without recomputing them. Similarity.find_similarity uses these same functions.
+
+def svm_similarity(F1, F2, n_splits=5, seed=0):
+    """
+    Classifier-based similarity (paper Sec. 3): can an SVM tell F1's samples from F2's?
+    F1, F2 are sample matrices, one row per neighborhood/community, e.g. netsimile(G, "svm")
+    Returns 1 - canberra(P1, P2) in [-1, 1]: 1 = indistinguishable, -1 = perfectly separated
+    Note that the paper does not define the splits used for CV
+    """
+    X = np.vstack([F1, F2])
+    y = np.array([0] * len(F1) + [1] * len(F2))
+
+    # every row is predicted by a model that never trained on it
+    # scaler is inside the pipeline so it's only fit on the training folds
+    # paper doesn't give folds, kernel, or scaling: 5 folds, RBF kernel, standardized features
+    # StratifiedKFold needs at least n_splits rows from each graph
+    n_splits = min(n_splits, len(F1), len(F2))
+    folds = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    pred = cross_val_predict(make_pipeline(StandardScaler(), SVC()), X, y, cv=folds)
+
+    # paper builds these per cross-validation round; we pool predictions over all rounds
+    # P1 = [fraction of F1's rows predicted F1, fraction predicted F2], same for P2
+    P1 = np.array([np.mean(pred[y == 0] == 0), np.mean(pred[y == 0] == 1)])
+    P2 = np.array([np.mean(pred[y == 1] == 0), np.mean(pred[y == 1] == 1)])
+
+    return 1 - canberra(P1, P2)  # / len(P1) # suggested by claude but not in paper
+
+
+def match_similarity(F1, F2):
+    """
+    Matching-based similarity (paper Sec. 3): least-cost pairing of F1's rows with F2's rows.
+    Edge weight = Canberra distance; similarity = 1 - mean cost of the matched pairs.
+    """
+    cost = scipy.spatial.distance.cdist(F1, F2, "canberra") # step 1: 300X300 cost matrix representing the bipartite graph of all possible pairings
+    rows, cols = scipy.optimize.linear_sum_assignment(cost)     # step 2: Hungarian algorithm finds the minimum-cost matching of rows to columns
+    return 1 - cost[rows, cols].mean()           # step 3: similarity = 1 - mean cost of the matched pairs, in [0, 1]
+
+
 class Similarity:
     def __init__(self):
         pass
@@ -484,52 +525,11 @@ class Similarity:
         F1 = np.atleast_1d(method(G1, **kwargs))
         F2 = np.atleast_1d(method(G2, **kwargs))
 
-        def svm(F1, F2, n_splits=5, seed=0): # I dont think these are updatable from the outside, but they could be if we wanted to make them more flexible
-            """
-            Classifier-based similarity (paper Sec. 3): can an SVM tell F1's samples from F2's?
-            F1, F2 are sample matrices, one row per neighborhood/community, e.g. netsimile(G, "svm")
-            Returns 1 - canberra(P1, P2) in [-1, 1]: 1 = indistinguishable, -1 = perfectly separated
-            Note that the paper does not define the splits used for CV
-            """
-            X = np.vstack([F1, F2])
-            y = np.array([0] * len(F1) + [1] * len(F2))
-
-            # every row is predicted by a model that never trained on it
-            # scaler is inside the pipeline so it's only fit on the training folds
-            # paper doesn't give folds, kernel, or scaling: 5 folds, RBF kernel, standardized features
-            # StratifiedKFold needs at least n_splits rows from each graph
-            n_splits = min(n_splits, len(F1), len(F2))
-            folds = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
-            pred = cross_val_predict(make_pipeline(StandardScaler(), SVC()), X, y, cv=folds)
-
-            # paper builds these per cross-validation round; we pool predictions over all rounds
-            # P1 = [fraction of F1's rows predicted F1, fraction predicted F2], same for P2
-            P1 = np.array([np.mean(pred[y == 0] == 0), np.mean(pred[y == 0] == 1)])
-            P2 = np.array([np.mean(pred[y == 1] == 0), np.mean(pred[y == 1] == 1)])
-            P1 = np.atleast_1d(P1)
-            P2 = np.atleast_1d(P2)
-
-            return P1, P2
-
-        def match(F1, F2):
-            """
-            Matching-based similarity (paper Sec. 3): least-cost pairing of F1's rows with F2's rows.
-            Edge weight = Canberra distance; similarity = 1 - mean cost of the matched pairs.
-            """
-            cost = scipy.spatial.distance.cdist(F1, F2, "canberra") # step 1: 300X300 cost matrix representing the bipartite graph of all possible pairings
-            rows, cols = scipy.optimize.linear_sum_assignment(cost)     # step 2: Hungarian algorithm finds the minimum-cost matching of rows to columns
-            return 1 - cost[rows, cols].mean()           # step 3: similarity = 1 - mean cost of the matched pairs, in [0, 1]
-
-        
         if type == "svm":
-            # P1 = [fraction of F1's rows predicted G1, fraction predicted G2], same for P2
-            P1, P2 = svm(F1, F2)
-            return 1 - canberra(P1, P2)  # / len(P1) # suggested by claude but not in paper
+            return svm_similarity(F1, F2)
 
         if type == "match":
-            return match(F1, F2)  # already in [0, 1]
-        
+            return match_similarity(F1, F2)  # already in [0, 1]
+
         # canberra is in [0, len(F)]
         return 1 - canberra(F1, F2) # / len(F1) # divide by len to keep similarity in [0, 1]suggested by claude but not in paper
-
-    
