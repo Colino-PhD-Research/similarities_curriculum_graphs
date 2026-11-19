@@ -256,13 +256,27 @@ def cross_sectional_experiment(
     seed: int = 0,
 ) -> dict[str, RankingComparison]:
     """Use each network in turn as the reference; rank the others plus its two baselines."""
-    results = {}
-    for ref_name, G_ref in networks.items():
-        comparisons = {name: H for name, H in networks.items() if name != ref_name}
-        for kind, H in make_baselines(G_ref, frac, seed).items():
-            comparisons[f"{ref_name}-{kind}"] = H
-        results[ref_name] = compare_methods(G_ref, comparisons, feature_methods, pairwise_methods)
-    return results
+    return {ref_name: cross_sectional_reference(ref_name, networks, feature_methods,
+                                                pairwise_methods, frac, seed)
+            for ref_name in networks}
+
+
+def cross_sectional_reference(
+    ref_name: str,
+    networks: Mapping[str, nx.Graph],
+    feature_methods: Mapping[str, FeatureFn] | None = None,
+    pairwise_methods: Mapping[str, PairwiseFn] | None = None,
+    frac: float = 0.05,
+    seed: int = 0,
+) -> RankingComparison:
+    """One reference of the cross-sectional experiment: rank every other network in
+    `networks` plus the reference's two baselines. Split out so callers can run (and save)
+    one reference at a time."""
+    G_ref = networks[ref_name]
+    comparisons = {name: H for name, H in networks.items() if name != ref_name}
+    for kind, H in make_baselines(G_ref, frac, seed).items():
+        comparisons[f"{ref_name}-{kind}"] = H
+    return compare_methods(G_ref, comparisons, feature_methods, pairwise_methods)
 
 
 # hand-verified
