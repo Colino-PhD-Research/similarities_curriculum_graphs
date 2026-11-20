@@ -1,3 +1,10 @@
 .DS_Store
 __pycache__/
 *.pyc
+datasets/
+datasets 1.zip
+.vscode/
+.venv/
+.pytest_cache/
+eaai27.db
+similarities_curriculum_graphs.egg-info
