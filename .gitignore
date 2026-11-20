@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 datasets/
 datasets 1.zip
+.vscode/
+.venv/
+.pytest_cache/
+eaai27.db
