@@ -21,8 +21,7 @@ For what the paper specifies (and leaves unspecified), see
 | Amazon, DBLP, LJ1, LJ2, Email loaders | `load_data/load_data.py` | Done |
 | Twitter / Yahoo snapshot builders | `load_data/load_data.snapshots` | Done |
 | **Grad / Undergrad (Rice Facebook)** | — | **Missing**: no loader, and the Grad/Undergrad split isn't possible from `socfb-Rice31.mtx` alone (see §2.3) |
-| **Longitudinal driver** | — | **Missing**: §6 gives the code to write |
-| **Top-5 overlap (Fig. 11)** | — | **Missing**: §6.3 gives a snippet |
+| Longitudinal end-to-end script (10 datasets, Fig. 11 top-5 overlap, Fig. 22) | `run_experiments/longitudinal_experiments.py` | Done, tested with `--toy`; reference dates still to fill in |
 | Recurring clusters across references (Table 4) | `cross_sectional_experiments.cluster` | Done (§5.2) |
 | 20-method registry | `run_experiments/methods.py` | Done |
 | Cross-sectional end-to-end script (scores → tables → heatmaps → dendrograms → Table 4) | `run_experiments/cross_sectional_experiments.py` | Done, tested with `--toy` |
@@ -179,6 +178,17 @@ python -m run_experiments.cross_sectional_experiments              # amazon dblp
 python -m run_experiments.cross_sectional_experiments --networks amazon email --out small --runs 1000
 ```
 
+**Using other graphs.** The graphs come from a *network set*: any function that returns
+`{name: networkx.Graph}`. `paper` (`cross_sectional_networks`, the default) and `toy` are
+registered in `NETWORK_SETS` at the top of the script. To run on your own graphs, do one of:
+- add your function to `NETWORK_SETS` and run with `--network-set <key>`
+- leave it in any module and run with `--network-set my_package.my_module:my_function`
+- from Python, call `run_experiment(my_function(), out_dir)`
+
+`--networks a b c` keeps only those graphs from the set. If your function takes a `names`
+argument, only those graphs are loaded. Each set writes to its own folder,
+`results/<set name>/`, except `paper`, which writes to `results/cross_sectional/`.
+
 It writes:
 - `rankings/<ref>.pkl`: one pickled `RankingComparison` per reference, saved as soon as that
   reference finishes. References that are already done get skipped, so rerunning after a crash
@@ -278,67 +288,65 @@ table4 = sorted((sorted(g) for g, c in counts.items() if c >= min_refs), key=len
 
 ## 6. Longitudinal experiment (§5.4)
 
-There's no driver for this yet, but every piece it needs already exists. For each dataset: build
-the snapshots, choose a reference snapshot, add that snapshot's two baselines, and call
-`compare_methods`.
+The script is [run_experiments/longitudinal_experiments.py](../run_experiments/longitudinal_experiments.py).
+For each dataset it builds the snapshots, chooses a reference snapshot, adds that snapshot's two
+baselines, and runs the same analysis as the cross-sectional experiment.
 
-```python
-from load_data.load_data import snapshots, longitudinal_networks
-from rankings.ranking_comparisons import compare_methods, make_baselines
-
-def longitudinal_experiment(graphs, ref_label, frac=0.05, seed=0):
-    G_ref = graphs[ref_label]
-    comparisons = {lbl: G for lbl, G in graphs.items() if lbl != ref_label}
-    for kind, H in make_baselines(G_ref, frac, seed).items():
-        comparisons[f"{ref_label}-{kind}"] = H
-    return compare_methods(G_ref, comparisons, FEATURE_METHODS, PAIRWISE_METHODS)
-
-# Fill these in from Berlingerio et al. 2013 (the anomalous snapshot in each dataset)
-REFERENCES = {"twitter replies": "2009-06-??", "twitter retweets": "2009-0?", "yahoo": "2008-0?-??"}
-
-long_results = {}
-for name, kwargs in longitudinal_networks.items():
-    graphs = snapshots(**kwargs)
-    long_results[name] = longitudinal_experiment(graphs, REFERENCES[name])
+```bash
+python -m run_experiments.longitudinal_experiments --toy        # synthetic 8-snapshot series, ~2 min
+python -m run_experiments.longitudinal_experiments \
+    --reference replies=2009-06-?? --reference retweets=2009-0? --reference yahoo=2008-0?-??
+python -m run_experiments.longitudinal_experiments --auto-reference --datasets yahoo yahoo-4day
 ```
 
-The labels `snapshots` produces are `"YYYY-MM-DD"` for daily windows, `"YYYY-MM"` for monthly
-windows, and the first date of each bin when you pass `days=`.
+Output goes to `results/longitudinal/`, organized like the cross-sectional output. It saves one
+results file per dataset in `rankings/` and resumes after a crash the same way, so **delete
+`rankings/` after changing a method or a reference**. Its `tables/` folder also has
+`references.csv`, `closest_to_consensus.csv` (the longitudinal columns of Table 5),
+`fig22_distance_to_consensus.csv` and `top5_overlap_<dataset>.csv` (Figure 11). The top-5
+overlap is also plotted as a heatmap in `figures/`.
+
+Snapshot labels are `"YYYY-MM-DD"` for daily windows, `"YYYY-MM"` for monthly windows, and the
+first date of each bin for `days=` windows.
 
 ### 6.1 Choosing the reference
 The paper uses the snapshot that Berlingerio et al. (2013) found to be anomalous, and says
-the exact choice isn't essential. Look up those dates and put them in `REFERENCES`. If you can't
-find them, choose the snapshot that's furthest from the others on a simple macro statistic (for
-example, edge count) and report how you chose it.
+the exact choice isn't essential. The script takes each original dataset's reference, in this order:
+1. `--reference BASE=LABEL` on the command line (`BASE` is `replies`, `retweets` or `yahoo`)
+2. `REFERENCE_DATES` at the top of the script (all `None` for now)
+3. `--auto-reference`: the snapshot whose edge count is furthest from the median, on a log scale
+
+If none of these gives a reference, the script stops and says which one is missing. The
+choice is saved to `tables/references.csv`. If you use the automatic rule, report it as a
+deviation. For Yahoo it picks **2008-04-08**, the only day with all 100,000 users active
+(about twice the edges of any other day), so that is probably the paper's anomaly too. For
+Retweets it just picks the largest month (2009-09), since the network grows every month, so
+the automatic rule isn't meaningful there.
 
 ### 6.2 Re-aggregated datasets (7 in total)
 
-| Dataset | `snapshots(...)` arguments | Reference |
+| `--datasets` name | Snapshots | Reference |
 |---|---|---|
-| Twitter Replies, weekly | `**longitudinal_networks["twitter replies"]`, `days=7` | the window containing the original reference |
-| Twitter Replies, 3-day | same, `days=3` | the window containing the original reference |
-| Yahoo! IM, weekly | `**longitudinal_networks["yahoo"]`, `days=7` | the window containing the original reference |
-| Yahoo! IM, 4-day | same, `days=4` | the window containing the original reference |
-| Twitter Replies, cumulative | `..., cumulative=True` | last snapshot |
-| Twitter Retweets, cumulative | `..., cumulative=True` | last snapshot |
-| Yahoo! IM, cumulative | `..., cumulative=True` | last snapshot |
+| `replies-7day` | 5 weekly windows from Jun 1 (the last one covers only Jun 29–30) | the window containing the replies reference |
+| `replies-3day` | 10 three-day windows | the window containing the replies reference |
+| `yahoo-7day` | 4 weekly windows from Mar 31 | the window containing the yahoo reference |
+| `yahoo-4day` | 7 four-day windows | the window containing the yahoo reference |
+| `replies-cumulative` | 30, where snapshot t = all of Jun 1..t | last snapshot |
+| `retweets-cumulative` | 5 | last snapshot |
+| `yahoo-cumulative` | 28 | last snapshot |
 
 The split into 4 horizontal and 3 cumulative datasets is my reading of §5.4. Check it against
-the paper. To find the window that contains a date `d` among the bin labels:
-`max(l for l in graphs if l <= d)`. For cumulative datasets, the reference is
-`list(graphs)[-1]`.
+the paper.
 
-Run the same `consensus_table`, clustering and plotting steps on these results.
+### 6.3 Snapshot sizes (for estimating runtime)
+- **Replies:** each day has 4–9K nodes and is very sparse, with only 1–6% of nodes in the
+  largest component. The community samplers still find their 300 communities, in about 1 s each.
+- **Retweets:** each month has 26–120K nodes.
+- **Yahoo:** each day has 29–100K nodes.
+- **Cumulative:** the final snapshot has 107K nodes for replies, 218K for retweets, and 100K
+  nodes with 588K edges for yahoo.
 
-### 6.3 Top-5 overlap between rankings (Fig. 11)
-
-```python
-import pandas as pd
-
-def top5_overlap(r, n=5):
-    top = {m: set(r.ranks.loc[m].nsmallest(n).index) for m in r.ranks.index}
-    return pd.DataFrame({a: {b: len(top[a] & top[b]) / n for b in top} for a in top})
-```
+Yahoo daily (28 snapshots) and the cumulative datasets will take the longest.
 
 ---
 
@@ -378,5 +386,5 @@ def top5_overlap(r, n=5):
 6. [x] `run_experiments/methods.py` (§3)
 7. [ ] Run `python -m run_experiments.cross_sectional_experiments --toy`, then run it on the real networks (§4).
    This covers the heatmaps, Table 5, Figure 7, the dendrograms and Table 4
-8. [ ] Fill in the reference snapshots, then run the longitudinal experiment and the 7 re-aggregations (§6)
-9. [ ] Produce the top-5 overlap (Fig. 11) and the longitudinal consensus (Fig. 22)
+8. [ ] Look up the anomalous snapshots (Berlingerio et al. 2013) and put them in `REFERENCE_DATES` (§6.1)
+9. [ ] Run `python -m run_experiments.longitudinal_experiments` (all 10 datasets, Fig. 11, Fig. 22)
