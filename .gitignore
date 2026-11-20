@@ -7,3 +7,4 @@ datasets 1.zip
 .venv/
 .pytest_cache/
 eaai27.db
+similarities_curriculum_graphs.egg-info

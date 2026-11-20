@@ -21,7 +21,7 @@ For what the paper specifies (and leaves unspecified), see
 | Amazon, DBLP, LJ1, LJ2, Email loaders | `load_data/load_data.py` | Done |
 | Twitter / Yahoo snapshot builders | `load_data/load_data.snapshots` | Done |
 | **Grad / Undergrad (Rice Facebook)** | — | **Missing**: no loader, and the Grad/Undergrad split isn't possible from `socfb-Rice31.mtx` alone (see §2.3) |
-| Longitudinal end-to-end script (10 datasets, Fig. 11 top-5 overlap, Fig. 22) | `run_experiments/longitudinal_experiments.py` | Done, tested with `--toy`; reference dates still to fill in |
+| Longitudinal end-to-end script (10 datasets, Fig. 11 top-5 overlap, Fig. 22) | `run_experiments/cross_sectional_experiments.py --longitudinal` | Done, tested with `--toy`; reference dates still to fill in |
 | Recurring clusters across references (Table 4) | `cross_sectional_experiments.cluster` | Done (§5.2) |
 | 20-method registry | `run_experiments/methods.py` | Done |
 | Cross-sectional end-to-end script (scores → tables → heatmaps → dendrograms → Table 4) | `run_experiments/cross_sectional_experiments.py` | Done, tested with `--toy` |
@@ -288,15 +288,15 @@ table4 = sorted((sorted(g) for g, c in counts.items() if c >= min_refs), key=len
 
 ## 6. Longitudinal experiment (§5.4)
 
-The script is [run_experiments/longitudinal_experiments.py](../run_experiments/longitudinal_experiments.py).
+Run [run_experiments/cross_sectional_experiments.py](../run_experiments/cross_sectional_experiments.py) with `--longitudinal`.
 For each dataset it builds the snapshots, chooses a reference snapshot, adds that snapshot's two
 baselines, and runs the same analysis as the cross-sectional experiment.
 
 ```bash
-python -m run_experiments.longitudinal_experiments --toy        # synthetic 8-snapshot series, ~2 min
-python -m run_experiments.longitudinal_experiments \
+python -m run_experiments.cross_sectional_experiments --longitudinal --toy   # synthetic 8-snapshot series, ~2 min
+python -m run_experiments.cross_sectional_experiments --longitudinal \
     --reference replies=2009-06-?? --reference retweets=2009-0? --reference yahoo=2008-0?-??
-python -m run_experiments.longitudinal_experiments --auto-reference --datasets yahoo yahoo-4day
+python -m run_experiments.cross_sectional_experiments --longitudinal --auto-reference --datasets yahoo yahoo-4day
 ```
 
 Output goes to `results/longitudinal/`, organized like the cross-sectional output. It saves one
@@ -387,4 +387,4 @@ Yahoo daily (28 snapshots) and the cumulative datasets will take the longest.
 7. [ ] Run `python -m run_experiments.cross_sectional_experiments --toy`, then run it on the real networks (§4).
    This covers the heatmaps, Table 5, Figure 7, the dendrograms and Table 4
 8. [ ] Look up the anomalous snapshots (Berlingerio et al. 2013) and put them in `REFERENCE_DATES` (§6.1)
-9. [ ] Run `python -m run_experiments.longitudinal_experiments` (all 10 datasets, Fig. 11, Fig. 22)
+9. [ ] Run `python -m run_experiments.cross_sectional_experiments --longitudinal` (all 10 datasets, Fig. 11, Fig. 22)
