@@ -6,4 +6,14 @@ infomap
 scikit-learn
 matplotlib
 pandas
+duckdb==1.3.0 
 
+# utilties requirements
+# pygraphviz needs the Graphviz C library. On a Mac, install it first and
+# point pip at it (use pip in the venv, not conda):
+#   brew install graphviz
+#   GV=$(brew --prefix graphviz)
+#   CFLAGS="-I$GV/include" LDFLAGS="-L$GV/lib" pip install -r requirements.txt
+pygraphviz==2.0.4
+pyvis==0.3.2
+beautifulsoup4==4.12.3
