@@ -4,6 +4,7 @@ import sys
 import os
 
 import database.config.config as config
+import pandas as pd
 
 def get_db_connection():
     # open db connection
@@ -323,3 +324,30 @@ def get_percentages(counts, num_schools, ndigits=2):
         percentages[key] = round(value / num_schools, ndigits)
     
     return percentages
+
+"""
+Valid stratifications: "research", "non_research", "private", "public", "computing", "engineering", "arts_and_sciences", "other"
+
+The last 4 are related to the school the program is housed in.
+Each maps to (column, exact value) in ai_universities_attributes.csv.
+"""
+_STRATIFICATION_MAP = {
+    "research":          ("CS/ENG research univ or not research", "research"),
+    "non_research":      ("CS/ENG research univ or not research", "non-research"),
+    "private":           ("Private vs Public", "Private"),
+    "public":            ("Private vs Public", "Public"),
+    "computing":         ("School Housed In", "Computing"),
+    "engineering":       ("School Housed In", "Engineering"),
+    "arts_and_sciences": ("School Housed In", "A&S"),
+    "other":             ("School Housed In", "Other"),
+}
+valid_stratifications = list(_STRATIFICATION_MAP)
+
+def get_universities_by_stratification(stratification):
+    if stratification not in _STRATIFICATION_MAP:
+        raise ValueError(f"{stratification} is invalid. Must be one of {valid_stratifications}")
+
+    col, value = _STRATIFICATION_MAP[stratification]
+    df = pd.read_csv(os.path.join(config.PROJ_ROOT, "ai_universities_attributes.csv"))
+
+    return df.loc[df[col] == value, "university"].to_list()

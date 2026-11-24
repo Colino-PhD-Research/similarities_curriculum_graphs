@@ -1,0 +1,54 @@
+,network,nodes,edges,avg_degree,max_degree,density,transitivity,num_cc,frac_in_lcc
+0,Brigham Young University:Bachelor of Science in Machine Learning,66,118,3.5757575757575757,12,0.05501165501165501,0.0996309963099631,1,1.0
+1,Capitol Technology University:Bachelor of Science in Artificial Intelligence,58,84,2.896551724137931,10,0.050816696914700546,0.17586206896551723,2,0.9655172413793104
+2,Champlain College:Bachelor of Science in Data Science and Artificial Intelligence,18,22,2.4444444444444446,6,0.1437908496732026,0.057692307692307696,1,1.0
+3,Dakota State University:Bachelor of Science in Artificial Intelligence,32,59,3.6875,11,0.11895161290322581,0.29069767441860467,1,1.0
+4,Drake University:Artificial Intelligence Bachelor of Arts,42,75,3.5714285714285716,10,0.08710801393728224,0.2422360248447205,1,1.0
+5,Drexel University:Bachelor of Science in Artificial Intelligence and Machine Learning,116,157,2.706896551724138,13,0.023538230884557722,0.08053691275167785,3,0.8793103448275862
+6,Farmingdale State College:Bachelor of Science in Artificial Intelligence Management,20,25,2.5,6,0.13157894736842105,0.21428571428571427,2,0.7
+7,Ferris State University:Bachelor of Science in Artificial Intelligence,44,74,3.3636363636363638,10,0.07822410147991543,0.1919191919191919,5,0.5909090909090909
+8,Grand Valley State University:Bachelor of Science in Artificial Intelligence,63,108,3.4285714285714284,9,0.055299539170506916,0.08590308370044053,1,1.0
+9,Hallmark University:Bachelor of Science in Artificial Intelligence,28,24,1.7142857142857142,3,0.06349206349206349,0.0,4,0.75
+10,Harding University:Bachelor of Science in Artificial Intelligence,38,55,2.8947368421052633,8,0.07823613086770982,0.28651685393258425,1,1.0
+11,Hofstra University:Bachelor of Science in Data Science and Machine Learning,32,50,3.125,11,0.10080645161290322,0.19672131147540983,1,1.0
+12,Illinois Institute of Technology:Bachelor of Science in Artificial Intelligence,81,137,3.382716049382716,12,0.042283950617283954,0.06930693069306931,5,0.7530864197530864
+13,Kansas State University:Bachelor of Science in Machine Learning and Autonomous Systems,58,85,2.9310344827586206,7,0.0514216575922565,0.02553191489361702,3,0.8793103448275862
+14,Kean University:Bachelor of Science in Artificial Intelligence,41,54,2.6341463414634148,9,0.06585365853658537,0.09278350515463918,2,0.926829268292683
+15,Lindenwood University:Bachelor of Arts in Applied Artificial Intelligence,43,56,2.604651162790698,16,0.06201550387596899,0.04918032786885246,4,0.627906976744186
+16,Long Island University:Bachelor of Science in Artificial Intelligence,24,23,1.9166666666666667,5,0.08333333333333333,0.08571428571428572,3,0.5416666666666666
+17,Louisiana State University and Agricultural & Mechanical College:Bachelor of Science in Artificial Intelligence,38,48,2.526315789473684,7,0.06827880512091039,0.11029411764705882,2,0.8157894736842105
+18,Marymount University:Bachelor of Science in Artificial Intelligence,33,26,1.5757575757575757,5,0.04924242424242424,0.0,7,0.3939393939393939
+19,Metropolitan State University of Denver:Bachelor of Science in Data Science and Machine Learning,41,59,2.8780487804878048,10,0.07195121951219512,0.029556650246305417,1,1.0
+20,Miami University-Oxford:Bachelor of Science in Artificial Intelligence,22,39,3.5454545454545454,8,0.16883116883116883,0.15789473684210525,1,1.0
+21,Middle Georgia State University:Bachelor of Science in Applied Artificial Intelligence,45,42,1.8666666666666667,10,0.04242424242424243,0.0,4,0.6222222222222222
+22,New Mexico State University-Main Campus:Bachelor of Science in Artificial Intelligence,140,187,2.6714285714285713,41,0.01921891058581706,0.019054340155257588,2,0.9642857142857143
+23,North Carolina A & T State University:Bachelor of Science in Artificial Intelligence,27,34,2.5185185185185186,8,0.09686609686609686,0.2079207920792079,3,0.8148148148148148
+24,North Carolina A & T State University:Bachelor of Science in Applied Artificial Intelligence,22,29,2.6363636363636362,7,0.12554112554112554,0.25609756097560976,2,0.9090909090909091
+25,Northeastern State University:Bachelor of Science in Artificial Intelligence and Data Analytics,14,13,1.8571428571428572,6,0.14285714285714285,0.0,3,0.7142857142857143
+26,Northeastern University:Bachelor of Science in Artificial Intelligence,58,89,3.0689655172413794,10,0.05384150030248034,0.0,4,0.7931034482758621
+27,Ohio University-Main Campus:Bachelor of Science in Artificial Intelligence,65,98,3.0153846153846153,15,0.047115384615384615,0.09375,2,0.9538461538461539
+28,Pace University:Bachelor of Science in Artificial Intelligence,20,42,4.2,8,0.22105263157894736,0.3880597014925373,1,1.0
+29,Pennsylvania State University-Main Campus:Bachelor of Science in Artificial Intelligence Engineering,89,270,6.067415730337078,17,0.06894790602655772,0.08639108221086855,1,1.0
+30,Pennsylvania State University-Main Campus:Bachelor of Science in Artificial Intelligence Methods and Applications,62,191,6.161290322580645,14,0.10100475938656796,0.06798245614035088,1,1.0
+31,Quinnipiac University:Bachelor of Science in Artificial Intelligence and Computing,24,35,2.9166666666666665,7,0.12681159420289856,0.16129032258064516,2,0.7083333333333334
+32,Rhode Island College:Bachelor of Science in Artificial Intelligence,44,64,2.909090909090909,7,0.06765327695560254,0.08955223880597014,3,0.9090909090909091
+33,Rice University:Bachelor of Science in Artificial Intelligence,25,38,3.04,9,0.12666666666666668,0.0,1,1.0
+34,Rochester Institute of Technology:Bachelor of Science in Artificial Intelligence,93,215,4.623655913978495,17,0.05025712949976625,0.07547169811320754,3,0.946236559139785
+35,Tarleton State University:Bachelor of Science in Artificial Intelligence and Machine Learning,51,100,3.9215686274509802,14,0.0784313725490196,0.09164969450101833,1,1.0
+36,The University of Tennessee-Knoxville:Bachelor of Science in Applied Artificial Intelligence,55,59,2.1454545454545455,9,0.03973063973063973,0.0,8,0.34545454545454546
+37,The University of Texas at El Paso:Bachelor of Science in Artificial Intelligence,97,287,5.917525773195877,17,0.06164089347079038,0.36613175675675674,3,0.6288659793814433
+38,University of California-San Diego:Bachelor of Science in Artificial Intelligence,159,423,5.320754716981132,28,0.03367566276570337,0.10736266241167085,7,0.8679245283018868
+39,University of Delaware:Bachelor of Science in Artificial Intelligence Engineering,160,321,4.0125,21,0.025235849056603775,0.14285714285714285,3,0.91875
+40,University of Michigan-Flint:Bachelor of Science in Artificial Intelligence,30,48,3.2,9,0.1103448275862069,0.06382978723404255,2,0.9333333333333333
+41,University of Nebraska at Omaha:Bachelor of Science in Artificial Intelligence,44,70,3.1818181818181817,9,0.07399577167019028,0.10975609756097561,2,0.8863636363636364
+42,University of New Haven:Bachelor of Science in Artificial Intelligence,50,63,2.52,8,0.05142857142857143,0.06349206349206349,6,0.7
+43,University of North Carolina at Charlotte:Bachelor of Science in Artificial Intelligence,27,43,3.185185185185185,8,0.1225071225071225,0.1518987341772152,1,1.0
+44,University of Oklahoma-Norman Campus:Bachelor of Science in Applied Artificial Intelligence,26,32,2.4615384615384617,5,0.09846153846153846,0.0,3,0.7307692307692307
+45,University of Pennsylvania:Bachelor of Science in Engineering in Artificial Intelligence,112,139,2.482142857142857,13,0.022361647361647363,0.07534246575342465,12,0.6517857142857143
+46,University of South Florida:Bachelor of Science in Artificial Intelligence,27,36,2.6666666666666665,8,0.10256410256410256,0.14018691588785046,1,1.0
+47,University of Southern California:Bachelor of Science in Artificial Intelligence,96,189,3.9375,20,0.04144736842105263,0.07367387033398821,3,0.84375
+48,University of Tulsa:Bachelor of Science in Applied Artificial Intelligence,39,51,2.6153846153846154,6,0.06882591093117409,0.02608695652173913,1,1.0
+49,University of Wisconsin-Eau Claire:Bachelor of Arts or Bachelor of Science in Artificial Intelligence,39,65,3.3333333333333335,9,0.08771929824561403,0.10126582278481013,1,1.0
+50,University of Wisconsin-Eau Claire:Artificial Intelligence Comprehensive Major,42,69,3.2857142857142856,9,0.08013937282229965,0.0963855421686747,1,1.0
+51,Walsh College:Bachelor of Science in Information Technology Artificial Intelligence and Machine Learning,25,23,1.84,5,0.07666666666666666,0.08823529411764706,5,0.52
+52,Xavier University:Bachelor of Arts in Artificial Intelligence,38,46,2.4210526315789473,6,0.06543385490753911,0.30612244897959184,6,0.2894736842105263

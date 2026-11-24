@@ -23,6 +23,8 @@ import sys
 import numpy as np
 import pandas as pd
 import networkx
+from utility.program_structure.build_graph_from_db import build_graph
+from utility.universal_helpers import get_verified_ai_majors
 
 try:
     from load_data.load_data import (cross_sectional_files, load_cross_sectional_network,
@@ -83,10 +85,28 @@ def longitudinal_stats():
         rows.append(row)
     return pd.DataFrame(rows)
 
+def ai_major_stats():
+    # get list of AI majors
+    universities_programs = get_verified_ai_majors()
+
+    # build graph for each major
+    graphs = [(f"{university}:{program}", build_graph(university, program, allow_messy=True)) for university, program in universities_programs]
+
+    # make dataframe calculating network statistics for each major (graph)
+    df = pd.DataFrame([{"network": name, **network_stats(G)} for name, G in graphs])
+    df.to_csv("ai_curriculum_non_aggregated_stats.csv")
+
+    # aggregate the previous dataframe to match the output of the two other datasets from the paper
+    row = {}
+    for stat, fmt in STAT_FORMATS.items():
+        lo, hi = df[stat].min(), df[stat].max()
+        row[stat] = f"{fmt.format(lo)}–{fmt.format(hi)}"
+    return pd.DataFrame(row, index=[0])
 
 if __name__ == "__main__":
     tables = {"cross_sectional_stats": cross_sectional_stats(),
-              "longitudinal_stats": longitudinal_stats()}
+              "longitudinal_stats": longitudinal_stats(),
+              "ai_majors": ai_major_stats()}
     for file_name, df in tables.items():
         with pd.option_context("display.width", 250, "display.max_columns", None):
             print(df)
