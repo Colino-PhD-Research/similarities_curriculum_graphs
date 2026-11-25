@@ -17,15 +17,15 @@ Each reference's (or dataset's) RankingComparison is pickled as soon as it finis
 finished ones are skipped on rerun, so an interrupted run can be resumed.
 
 Run from the repo root:
-    python -m run_experiments.cross_sectional_experiments --toy     # 4 synthetic graphs, ~5 min
-    python -m run_experiments.cross_sectional_experiments           # amazon dblp lj1 lj2 email
-    python -m run_experiments.cross_sectional_experiments --networks amazon email --out small
-    python -m run_experiments.cross_sectional_experiments --network-set my_package.my_module:my_function
+    python -m run_experiments.run_experiments --toy     # 4 synthetic graphs, ~5 min
+    python -m run_experiments.run_experiments           # amazon dblp lj1 lj2 email
+    python -m run_experiments.run_experiments --networks amazon email --out small
+    python -m run_experiments.run_experiments --network-set my_package.my_module:my_function
 
-    python -m run_experiments.cross_sectional_experiments --longitudinal --toy
-    python -m run_experiments.cross_sectional_experiments --longitudinal \\
+    python -m run_experiments.run_experiments --longitudinal --toy
+    python -m run_experiments.run_experiments --longitudinal \\
         --reference replies=2009-06-14 --reference retweets=2009-07 --reference yahoo=2008-04-08
-    python -m run_experiments.cross_sectional_experiments --longitudinal --auto-reference \\
+    python -m run_experiments.run_experiments --longitudinal --auto-reference \\
         --datasets yahoo yahoo-4day
 
 The cross-sectional graphs come from a "network set": any function returning
@@ -421,7 +421,7 @@ def run_experiment(networks, out_dir, frac=0.05, seed=0, alpha=0.1, runs=1000, m
     out_dir.
 
     From Python, e.g.:
-        from run_experiments.cross_sectional_experiments import run_experiment, RESULTS_DIR
+        from run_experiments.run_experiments import run_experiment, RESULTS_DIR
         run_experiment(my_networks(), os.path.join(RESULTS_DIR, "my_run"))
     """
     if not networks:
