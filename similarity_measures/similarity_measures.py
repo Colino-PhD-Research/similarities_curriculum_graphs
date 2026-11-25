@@ -20,6 +20,11 @@ import math
 from collections import deque   # add with the other imports
 from collections import Counter    # for counting each node's neighbors in S
 
+def q_max(x):
+            return [*np.percentile(x, [25, 50, 75]), max(x)]          # 4 values: 25th percentile, median, 75th percentile, max
+
+def min_q_max(x):
+            return [min(x), *np.percentile(x, [25, 50, 75]), max(x)]  # 5 values
 
 
 class SimilarityMeasures:
@@ -177,7 +182,7 @@ class SimilarityMeasures:
             return np.array([im_in, im_known])  
 
     def degree(self, G):
-        """Average node degree of G (2|E| / |V| for an undirected graph), as a 0-d np.ndarray."""
+        """Average node degree of G (2|E| / |V| ), as a 0-d np.ndarray."""
         return np.array(sum(d for n, d in G.degree()) / G.number_of_nodes())
 
     def density(self, G):
@@ -271,11 +276,6 @@ class SimilarityMeasures:
         # calculate the number of nodes and edges in the subgraph H
         n, m = H.number_of_nodes(), H.number_of_edges()
 
-        def q_max(x):
-            return [*np.percentile(x, [25, 50, 75]), max(x)]          # 4 values: 25th percentile, median, 75th percentile, max
-
-        def min_q_max(x):
-            return [min(x), *np.percentile(x, [25, 50, 75]), max(x)]  # 5 values
 
         feats = [] # empty list to hold the features
 
@@ -470,11 +470,97 @@ class SimilarityMeasures:
         # [4]: restart to the start node with 0.15 probability at each step
         return self._sample_communities(G, self._rw_community, n_samples, k, seed, restart=0.15)
 
-    
+
+# Replaces the SimilarityMeasuresCurriculum class in the similarity-measures module.
+# Uses only imports that module already has (nx, np, random,
+# feature_extraction, graph_signature).
+
+
+class SimilarityMeasuresCurriculum(SimilarityMeasures):
+
+    @staticmethod
+    def _feature_output(f, type, seed):
+        """Shared output step for the NetSimile variants.
+
+        "vector": graph signature, 5 aggregates (median, mean, std, skew, kurtosis)
+        per feature column, NaNs (e.g. skew of a constant column) set to 0.
+        "svm" / "match": per-node rows for a random sample of up to 300 nodes.
+        """
+        if type == "vector":
+            return np.nan_to_num(graph_signature(f), nan=0.0)
+        idx = random.Random(seed).sample(range(len(f)), min(300, len(f)))
+        return f[idx]
+
+    @staticmethod
+    def _check_type(type):
+        if type not in ("vector", "svm", "match"):
+            raise ValueError(f"Feature type {type} invalid. Must be vector, svm, match")
+
+    def netsimile_directed_simple(self, G, netsimile_type="vector", seed=0):
+        """netrd's 7 NetSimile features computed on a DiGraph: shape (35,) or (<=300, 7).
+
+        Direction is used inconsistently: degree is in + out, neighbor features and
+        egonets follow out-edges only, clustering is directed (Fagiolo).
+        """
+        G = nx.DiGraph(G)
+        self._check_type(netsimile_type)
+        return self._feature_output(feature_extraction(nx.DiGraph(G)), netsimile_type, seed)
+
+    def netsimile_directed(self, G, netsimile_type="vector", seed=0):
+        """Directed NetSimile, each feature split by direction: shape (60,) or (<=300, 12).
+
+        G must be directed; parallel edges are merged and self-loops removed.
+        Per-node columns (rows follow sorted(G.nodes())):
+            0-1   in-degree, out-degree
+            2     directed clustering (Fagiolo)
+            3-4   mean total degree of successors, of predecessors
+            5-6   mean clustering of successors, of predecessors
+            7     directed edges inside the egonet
+            8-9   edges leaving the egonet, edges entering it
+            10-11 outside nodes the egonet points to, outside nodes pointing into it
+        Egonet = node + successors + predecessors. Averages over an empty
+        neighbor set are 0. The means of columns 0 and 1 are both |E|/|V|.
+        """
+        self._check_type(netsimile_type)
+        if not G.is_directed():
+            raise ValueError("netsimile_directed needs a directed graph; use netsimile for undirected graphs")
+
+        G = nx.DiGraph(G)
+        G.remove_edges_from(list(nx.selfloop_edges(G)))
+        ind, outd, clust = dict(G.in_degree()), dict(G.out_degree()), nx.clustering(G)
+
+        def avg(values):
+            values = list(values)
+            return float(np.mean(values)) if values else 0.0
+
+        rows = []
+        for v in sorted(G):
+            succ, pred = set(G.successors(v)), set(G.predecessors(v))
+            ego = succ | pred | {v}
+            inside = sum(w in ego for u in ego for w in G.successors(u))        # internal edges
+            out_nbrs = set().union(*(G.successors(u) for u in ego)) - ego
+            in_nbrs = set().union(*(G.predecessors(u) for u in ego)) - ego
+            rows.append([
+                ind[v], outd[v], clust[v],
+                avg(ind[u] + outd[u] for u in succ), avg(ind[u] + outd[u] for u in pred),
+                avg(clust[u] for u in succ), avg(clust[u] for u in pred),
+                inside,
+                sum(outd[u] for u in ego) - inside,    # every out-edge from ego is internal or leaving
+                sum(ind[u] for u in ego) - inside,     # every in-edge into ego is internal or entering
+                len(out_nbrs), len(in_nbrs),
+            ])
+
+        return self._feature_output(np.array(rows, dtype=float), netsimile_type, seed)
+
+    def density(self, G):
+        """Undirected: |E| / (|V|(|V|-1)/2). Directed: |E| / (|V|(|V|-1))."""
+        return np.array(nx.density(G))
+
+
 
 # Scoring functions for the classifier- and matching-based methods. They take the two graphs'
 # sample matrices (one row per node / community sample), so callers that already have the
-# features (e.g. a cache in run_experiments/cross_sectional_experiments.py) can score a pair
+# features (e.g. a cache in run_experiments/run_experiments.py) can score a pair
 # without recomputing them. Similarity.find_similarity uses these same functions.
 
 def svm_similarity(F1, F2, n_splits=5, seed=0):

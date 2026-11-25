@@ -48,7 +48,7 @@ def _pairwise(sampler, scorer):
     return lambda G1, G2: scorer(sampler(G1), sampler(G2))
 
 
-# (G_ref, H) -> similarity, sampling both graphs on every call. cross_sectional_experiments.py
+# (G_ref, H) -> similarity, sampling both graphs on every call. run_experiments.py
 # builds cached versions from SAMPLERS and PAIRWISE_SPECS instead.
 PAIRWISE_METHODS = {name: _pairwise(SAMPLERS[key], scorer)
                     for name, (key, scorer) in PAIRWISE_SPECS.items()}
