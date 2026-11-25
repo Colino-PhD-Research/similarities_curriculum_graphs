@@ -278,8 +278,10 @@ def run_references(networks, out_dir, frac, seed, references=None):
                                                  pairwise_methods, frac, seed)
 
         # save right away so a crash on a later reference doesn't lose this one
-        with open(path, "wb") as f:
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as f:
             pickle.dump(results[key], f)
+        os.replace(tmp, path)   # atomic: a killed job never leaves a partial .pkl
         log(f"{tag} done in {fmt_duration(time.perf_counter() - ref_start)} "
             f"(total so far {fmt_duration(time.perf_counter() - run_start)}), saved {path}")
     return results
