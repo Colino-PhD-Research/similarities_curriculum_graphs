@@ -42,6 +42,8 @@ import os
 import pickle
 import time
 from collections import Counter
+import hashlib
+import re
 
 import matplotlib
 matplotlib.use("Agg")   # save figures, never open windows (must be set before pyplot is imported)
@@ -145,39 +147,70 @@ def resolve_network_set(spec):
 class FeatureCache:
     """Computes each method's features (or samples) for each graph once, then reuses them.
 
-    Without it, every network's features are recomputed for every reference it is compared
-    against, and pairwise methods resample both graphs on every call (and BFS / BFS-Dist etc.
-    draw the same samples twice). All methods are seeded, so reusing features gives exactly
-    the same scores.
+    Same as before in memory, plus every computed entry is pickled to cache_dir, so a run
+    that is killed (time limit, OOM) keeps everything it finished: the next run loads it
+    from disk instead of recomputing. Named networks are stored by name; baselines (which
+    have no name, but are regenerated identically each run from the same seed) are stored
+    by a hash of their edges.
 
-    Graphs are told apart by id(). The networks in `networks` live for the whole run, so their
-    entries are kept across references. A reference's two baselines are new graphs each time,
-    so their entries are dropped by new_reference() (they're only compared with that
-    reference); each entry also holds the graph itself, so its id can't be reused by another
-    graph while the entry exists.
+    Delete cache_dir after changing a method, or stale features get reused.
     """
 
-    def __init__(self, networks):
+    def __init__(self, networks, cache_dir=None):
         self.names = {id(G): name for name, G in networks.items()}
         self.kept = {}        # (key, id(G)) -> (G, features), for graphs in `networks`
         self.baselines = {}   # same, for the current reference's baselines
+        self.fingerprints = {}  # id(G) -> edge hash, for baselines (computed once each)
+        self.cache_dir = cache_dir
+        if cache_dir:
+            os.makedirs(cache_dir, exist_ok=True)
 
     def new_reference(self):
         self.baselines.clear()
+        self.fingerprints.clear()
 
     def name(self, G):
         return self.names.get(id(G), "baseline")
 
+    def _label(self, G):
+        """Stable name for G across runs: its network name, or a hash of its edges."""
+        if id(G) in self.names:
+            return self.names[id(G)]
+        if id(G) not in self.fingerprints:
+            h = hashlib.blake2b(digest_size=12)
+            h.update(f"{G.number_of_nodes()},{G.number_of_edges()}|".encode())
+            for u, v in G.edges():
+                h.update(f"{u},{v};".encode())
+            self.fingerprints[id(G)] = "baseline-" + h.hexdigest()
+        return self.fingerprints[id(G)]
+
+    def _path(self, key, G):
+        stem = "__".join(str(k) for k in key) + "__" + self._label(G)
+        stem = re.sub(r"[^A-Za-z0-9._-]", "_", stem)   # e.g. "IMIn&Known" -> "IMIn_Known"
+        return os.path.join(self.cache_dir, stem + ".pkl")
+
     def get(self, key, fn, G):
-        """fn(G), computed only the first time; returns (features, was_cached)."""
+        """fn(G), computed only the first time ever; returns (features, was_cached)."""
         store = self.kept if id(G) in self.names else self.baselines
         k = (key, id(G))
         if k in store:
             return store[k][1], True
+
+        path = self._path(key, G) if self.cache_dir else None
+        if path and os.path.exists(path):
+            with open(path, "rb") as f:
+                features = pickle.load(f)
+            store[k] = (G, features)
+            return features, True
+
         features = fn(G)
         store[k] = (G, features)
+        if path:
+            tmp = path + ".tmp"
+            with open(tmp, "wb") as f:
+                pickle.dump(features, f)
+            os.replace(tmp, path)   # atomic, same as the rankings
         return features, False
-
 
 def cached_methods(tag, cache):
     """Versions of all 20 methods that read features from `cache`, and print a line after
@@ -253,7 +286,7 @@ def run_references(networks, out_dir, frac, seed, references=None):
     os.makedirs(os.path.join(out_dir, "rankings"), exist_ok=True)
     results = {}
     run_start = time.perf_counter()
-    cache = FeatureCache(networks)   # shared by all references, so each network is featurized once
+    cache = FeatureCache(networks, os.path.join(out_dir, "features"))
     for i, (key, ref) in enumerate(references.items(), 1):
         tag = f"[{key} {i}/{len(references)}]"   # which reference we're on, e.g. [amazon 2/5]
 
